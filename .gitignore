@@ -1,0 +1,19 @@
+# Environment
+.env
+.venv/
+
+# Data
+data/
+chroma_db/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

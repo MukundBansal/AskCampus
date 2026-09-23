@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AskCampus — Chitkara University AI Assistant</title>
+    <meta name="description" content="Multi-agent AI assistant for Chitkara University, powered by Azure AI Foundry, Azure AI Search, and Azure OpenAI.">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div class="app">
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+
+            <div class="brand">
+                <div class="brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                </div>
+
+                <div>
+                    <h2>AskCampus</h2>
+                    <p>Multi-Agent Assistant</p>
+                </div>
+            </div>
+
+            <!-- Agent Status Panel -->
+            <div class="agent-panel">
+                <h3>Agent Pipeline</h3>
+
+                <div class="agent-status" id="agent-orchestrator">
+                    <div class="agent-dot"></div>
+                    <div class="agent-info">
+                        <span class="agent-name">Orchestrator</span>
+                        <span class="agent-desc">Routes & coordinates</span>
+                    </div>
+                </div>
+
+                <div class="agent-connector"></div>
+
+                <div class="agent-status" id="agent-retriever">
+                    <div class="agent-dot"></div>
+                    <div class="agent-info">
+                        <span class="agent-name">Retriever</span>
+                        <span class="agent-desc">Azure AI Search</span>
+                    </div>
+                </div>
+
+                <div class="agent-connector"></div>
+
+                <div class="agent-status" id="agent-advisor">
+                    <div class="agent-dot"></div>
+                    <div class="agent-info">
+                        <span class="agent-name">Advisor</span>
+                        <span class="agent-desc">Answer generation</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-info">
+                <div class="status">
+                    <span class="status-dot"></span>
+                    System Online
+                </div>
+
+                <p>
+                    Multi-agent RAG system powered by
+                    Azure AI Foundry, Azure AI Search,
+                    and Azure OpenAI.
+                </p>
+            </div>
+
+            <div class="sidebar-bottom">
+                <div class="powered-by">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M21.007 8.222A3.738 3.738 0 0 0 15.045 5.2a3.738 3.738 0 0 0 -5.596 -0.085 3.738 3.738 0 0 0 -5.137 1.397A3.738 3.738 0 0 0 2.93 12.42l6.564 6.564a2.1 2.1 0 0 0 2.97 0l6.564 -6.564a3.738 3.738 0 0 0 1.98 -4.198z"/>
+                    </svg>
+                    <span>Powered by <strong>Microsoft Azure</strong></span>
+                </div>
+            </div>
+
+        </aside>
+
+
+        <!-- Main -->
+        <main class="main">
+
+            <header class="header">
+                <div class="header-content">
+                    <div>
+                        <h1>AskCampus</h1>
+                        <p>Chitkara University Multi-Agent AI Assistant</p>
+                    </div>
+                    <div class="header-badges">
+                        <span class="badge">Azure AI Foundry</span>
+                        <span class="badge">AI Search</span>
+                        <span class="badge">Multi-Agent</span>
+                    </div>
+                </div>
+            </header>
+
+
+            <!-- Chat -->
+            <section id="chat" class="chat">
+
+                <div class="welcome" id="welcome">
+
+                    <div class="welcome-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+
+                    <h2>How can I help you?</h2>
+
+                    <p>
+                        Ask me anything about Chitkara University.
+                        My multi-agent system retrieves information from
+                        official university documents.
+                    </p>
+
+                    <div class="suggestions">
+
+                        <button onclick="useSuggestion('What is the course code of Database Management System?')">
+                            <span class="suggestion-icon">📚</span>
+                            DBMS course code
+                        </button>
+
+                        <button onclick="useSuggestion('What is the course code of Object Oriented Programming?')">
+                            <span class="suggestion-icon">💻</span>
+                            OOP course code
+                        </button>
+
+                        <button onclick="useSuggestion('What is the attendance requirement?')">
+                            <span class="suggestion-icon">📋</span>
+                            Attendance policy
+                        </button>
+
+                        <button onclick="useSuggestion('What are the objectives of the DBMS course?')">
+                            <span class="suggestion-icon">🎯</span>
+                            Course objectives
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Input -->
+            <div class="input-area">
+
+                <div class="input-box">
+
+                    <textarea
+                        id="question"
+                        placeholder="Ask a question about Chitkara University..."
+                        rows="1"
+                        onkeydown="handleKey(event)"
+                    ></textarea>
+
+                    <button
+                        id="sendButton"
+                        onclick="askQuestion()"
+                        aria-label="Send question"
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"/>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        </svg>
+                    </button>
+
+                </div>
+
+                <p class="input-note">
+                    Answers are grounded in official Chitkara University documents via multi-agent RAG.
+                </p>
+
+            </div>
+
+        </main>
+
+    </div>
+
+    <script src="script.js"></script>
+
+</body>
+
+</html>
