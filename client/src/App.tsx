@@ -1,6 +1,44 @@
-import React, { useState, useRef, useEffect } from 'react';
-import Hero from './components/ui/animated-shader-hero';
-import { Bot, Send, User, ChevronRight, CheckCircle2, Circle } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Bot, User, ChevronRight, Home, Clock, Settings, Check } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { Button } from './components/ui/button';
+import { BoltStyleChat, RayBackground, ChatInput as BoltChatInput } from './components/ui/bolt-style-chat';
+
+interface AutoResizeProps {
+  minHeight: number;
+  maxHeight?: number;
+}
+
+function useAutoResizeTextarea({ minHeight, maxHeight }: AutoResizeProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const adjustHeight = useCallback(
+    (reset?: boolean) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      if (reset) {
+        textarea.style.height = `${minHeight}px`;
+        return;
+      }
+
+      textarea.style.height = `${minHeight}px`; // reset first
+      const newHeight = Math.max(
+        minHeight,
+        Math.min(textarea.scrollHeight, maxHeight ?? Infinity)
+      );
+      textarea.style.height = `${newHeight}px`;
+    },
+    [minHeight, maxHeight]
+  );
+
+  useEffect(() => {
+    if (textareaRef.current) textareaRef.current.style.height = `${minHeight}px`;
+  }, [minHeight]);
+
+  return { textareaRef, adjustHeight };
+}
+
 
 interface AgentStep {
   agent: string;
@@ -40,6 +78,33 @@ function App() {
   const [activeAgent, setActiveAgent] = useState<string | null>(null);
   const [completedAgents, setCompletedAgents] = useState<Set<string>>(new Set());
 
+  const animateAgentPipeline = async () => {
+    setCompletedAgents(new Set());
+    
+    setActiveAgent('Orchestrator');
+    await new Promise(r => setTimeout(r, 800));
+    setCompletedAgents(prev => new Set(prev).add('Orchestrator'));
+    
+    setActiveAgent('Retriever');
+    await new Promise(r => setTimeout(r, 1200));
+    setCompletedAgents(prev => new Set(prev).add('Retriever'));
+    
+    setActiveAgent('Advisor');
+    await new Promise(r => setTimeout(r, 800));
+  };
+
+  const finalizeAgentPipeline = () => {
+    setActiveAgent(null);
+    setCompletedAgents(new Set(['Orchestrator', 'Retriever', 'Advisor']));
+  };
+
+  const { adjustHeight } = useAutoResizeTextarea({
+    minHeight: 48,
+    maxHeight: 150,
+  });
+  
+
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,8 +143,6 @@ function App() {
   const startNewChat = () => {
     setMessages([]);
     setCurrentSessionId(Date.now().toString());
-    setCompletedAgents(new Set());
-    setActiveAgent(null);
   };
 
   const loadSession = (id: string) => {
@@ -87,8 +150,6 @@ function App() {
     if (session) {
       setMessages(session.messages);
       setCurrentSessionId(session.id);
-      setCompletedAgents(new Set(['Orchestrator', 'Retriever', 'Advisor']));
-      setActiveAgent(null);
     }
   };
 
@@ -102,50 +163,36 @@ function App() {
     }
   }, [messages]);
 
-  const animateAgentPipeline = async () => {
-    setCompletedAgents(new Set());
-    
-    setActiveAgent('Orchestrator');
-    await new Promise(r => setTimeout(r, 800));
-    setCompletedAgents(prev => new Set(prev).add('Orchestrator'));
-    
-    setActiveAgent('Retriever');
-    await new Promise(r => setTimeout(r, 1200));
-    setCompletedAgents(prev => new Set(prev).add('Retriever'));
-    
-    setActiveAgent('Advisor');
-  };
 
-  const finalizeAgentPipeline = () => {
-    setActiveAgent(null);
-    setCompletedAgents(new Set(['Orchestrator', 'Retriever', 'Advisor']));
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  const handleSubmit = async (e?: React.FormEvent, overrideInput?: string) => {
+    if (e) e.preventDefault();
+    const finalInput = overrideInput || input;
+    if (!finalInput.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: input.trim(),
+      content: finalInput.trim(),
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    adjustHeight(true);
     setIsLoading(true);
 
     const loadingId = (Date.now() + 1).toString();
     setMessages(prev => [...prev, { id: loadingId, type: 'loading', content: '' }]);
 
-    animateAgentPipeline();
-
     try {
-      const response = await fetch('/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userMessage.content }),
-      });
+      const [response] = await Promise.all([
+        fetch('/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: userMessage.content }),
+        }),
+        animateAgentPipeline()
+      ]);
 
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}`);
@@ -181,235 +228,197 @@ function App() {
     }
   };
 
+
+
   const formatSource = (path: string) => {
     const parts = path.split('/');
     return parts[parts.length - 1];
   };
 
-  const scrollToChat = () => {
-    document.getElementById('chat-section')?.scrollIntoView({ behavior: 'smooth' });
-  };
-
   return (
-    <div className="min-h-screen flex flex-col bg-transparent text-zinc-50 font-sans overflow-x-hidden">
+    <div className="flex w-full h-screen bg-[#0f0f0f] text-slate-100 overflow-hidden font-sans">
       
-      <Hero
-        trustBadge={{
-          text: "Chitkara University AI Assistant",
-          icons: ["✨"]
-        }}
-        headline={{
-          line1: "Launch Your",
-          line2: "Research Into Orbit"
-        }}
-        subtitle="Supercharge your workflow with AI-powered answers grounded in official Chitkara University documents — fast, seamless, and intelligent."
-        buttons={{
-          primary: {
-            text: "Start Exploring",
-            onClick: scrollToChat
-          }
-        }}
-      />
-      
-      <main id="chat-section" className="flex-1 flex flex-col max-w-7xl w-full mx-auto p-4 md:p-8 py-24 relative z-10">
-        <div className="flex items-center gap-3 mb-8">
-            <Bot className="w-8 h-8 text-blue-500" />
-            <h2 className="text-3xl font-serif text-white">AskCampus Agent</h2>
-        </div>
-
-        <div className="flex-1 flex flex-col md:flex-row gap-8 min-h-[600px]">
-          
-          {/* Sidebar Area */}
-          <div className="w-full md:w-64 space-y-6">
-            
-            {/* Agent Pipeline */}
-            <div className="bg-black/20 backdrop-blur-md rounded-xl p-6 border border-white/10 shadow-2xl h-fit">
-              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-6">Agent Pipeline</h3>
-              
-              <div className="space-y-6">
-                {[
-                  { id: 'Orchestrator', desc: 'Routes & coordinates' },
-                  { id: 'Retriever', desc: 'Vector Search' },
-                  { id: 'Advisor', desc: 'Answer generation' }
-                ].map((agent, i) => {
-                  const isActive = activeAgent === agent.id;
-                  const isDone = completedAgents.has(agent.id);
-                  
-                  return (
-                    <div key={agent.id} className="relative">
-                      <div className="flex items-start gap-3">
-                        <div className={`mt-0.5 transition-colors ${
-                          isDone ? 'text-green-500' : 
-                          isActive ? 'text-blue-500' : 'text-zinc-700'
-                        }`}>
-                          {isDone ? <CheckCircle2 className="w-5 h-5" /> : 
-                           isActive ? <Circle className="w-5 h-5 fill-current animate-pulse" /> :
-                           <Circle className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <div className={`text-sm font-medium transition-colors ${
-                            isDone || isActive ? 'text-zinc-200' : 'text-zinc-500'
-                          }`}>{agent.id}</div>
-                          <div className="text-xs text-zinc-600 mt-1">{agent.desc}</div>
-                        </div>
-                      </div>
-                      {i < 2 && (
-                        <div className={`absolute left-2.5 top-6 bottom-[-1.5rem] w-px transition-colors ${
-                          isDone ? 'bg-green-500/30' : 'bg-zinc-800'
-                        }`} />
-                      )}
-                    </div>
-                  );
-                })}
+      {/* Sidebar - Retain minimalist sidebar from previous refactor for app functionality */}
+      <aside className="w-16 md:w-20 bg-[#0f0f0f] border-r border-white/5 flex flex-col items-center py-6 shadow-xl z-20 relative">
+        <div className="font-bold text-xl mb-8 tracking-tighter text-white">Ask</div>
+        <nav className="flex flex-col gap-4 w-full px-2">
+          <Button variant="ghost" className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 text-white hover:bg-white/20 mx-auto">
+            <Home className="w-5 h-5" />
+          </Button>
+          <Button variant="ghost" className="w-10 h-10 md:w-12 md:h-12 rounded-full text-[#8a8a8f] hover:text-white hover:bg-white/5 mx-auto relative group">
+            <Clock className="w-5 h-5" />
+            <div className="absolute left-full ml-4 bg-[#1a1a1e]/95 backdrop-blur-xl border border-white/10 p-4 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all w-64 z-50 pointer-events-none">
+              <h3 className="text-xs font-semibold text-[#5a5a5f] uppercase mb-2">History</h3>
+              <div className="space-y-1">
+                {sessions.map(s => (
+                  <div key={s.id} className="text-sm truncate text-[#a0a0a5] pointer-events-auto cursor-pointer hover:text-white py-1" onClick={() => loadSession(s.id)}>{s.title}</div>
+                ))}
+                {sessions.length === 0 && <div className="text-sm text-[#5a5a5f]">No history yet</div>}
               </div>
+              <Button onClick={startNewChat} className="w-full mt-3 bg-[#1488fc] hover:bg-[#1a94ff] pointer-events-auto text-xs h-8 text-white border-none rounded-full">New Chat</Button>
             </div>
+          </Button>
 
-            {/* Chat History */}
-            <div className="bg-black/20 backdrop-blur-md rounded-xl p-6 border border-white/10 shadow-2xl flex flex-col max-h-[350px]">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Chat History</h3>
-                <button 
-                  onClick={startNewChat}
-                  className="text-xs bg-blue-600/80 hover:bg-blue-500 text-white px-2 py-1 rounded transition-colors shadow"
-                >
-                  + New
-                </button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                {sessions.length === 0 ? (
-                  <p className="text-xs text-zinc-500 italic">No history yet</p>
-                ) : (
-                  [...sessions].sort((a, b) => b.timestamp - a.timestamp).map(session => (
-                    <div 
-                      key={session.id}
-                      onClick={() => loadSession(session.id)}
-                      className={`text-sm p-2 rounded cursor-pointer truncate transition-colors ${
-                        currentSessionId === session.id 
-                          ? 'bg-white/10 text-zinc-200' 
-                          : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-300'
-                      }`}
-                      title={session.title}
-                    >
-                      {session.title}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+        </nav>
+        <div className="mt-auto flex flex-col gap-4 w-full px-2">
+          <Button variant="ghost" className="w-10 h-10 md:w-12 md:h-12 rounded-full text-[#8a8a8f] hover:text-white hover:bg-white/5 mx-auto">
+            <Settings className="w-5 h-5" />
+          </Button>
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-white/10 mx-auto flex items-center justify-center overflow-hidden">
+            <User className="w-6 h-6 text-[#8a8a8f]" />
           </div>
+        </div>
+      </aside>
 
-          {/* Chat Area */}
-          <div className="flex-1 flex flex-col bg-black/20 backdrop-blur-md rounded-xl border border-white/10 shadow-2xl overflow-hidden">
+      {/* Main Content Area */}
+      <main className="flex-1 relative flex flex-col items-center overflow-y-auto custom-scrollbar bg-[#0f0f0f]">
+        
+        {messages.length === 0 ? (
+          <div className="w-full flex-1 flex flex-col items-center justify-center">
+            <BoltStyleChat 
+              title="What will you" 
+              subtitle="Chitkara, simplified." 
+              placeholder="Ask a question about Chitkara University..."
+              announcementText="AskCampus AI Agent"
+              onSend={(msg) => {
+                handleSubmit(undefined, msg);
+              }}
+            />
+          </div>
+        ) : (
+          <div className="w-full flex-1 flex flex-col items-center relative min-h-screen">
+            <RayBackground />
             
-            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-              {messages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center text-zinc-500">
-                  <Bot className="w-12 h-12 mb-4 opacity-50" />
-                  <p className="text-lg">Ask a question about Chitkara University...</p>
-                  <p className="text-sm mt-2 opacity-70">Answers are grounded in official documents.</p>
+            {/* Header when chatting */}
+            <div className="w-full p-4 md:p-6 flex justify-between items-center border-b border-white/5 sticky top-0 bg-[#0f0f0f]/80 backdrop-blur-xl z-20">
+              <div className="flex items-center gap-3 w-full max-w-4xl mx-auto">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-purple-500 p-0.5 shadow-lg shadow-blue-500/20">
+                  <div className="w-full h-full bg-[#1a1a1e] rounded-full" />
                 </div>
-              ) : (
-                messages.map(msg => (
-                  <div key={msg.id} className={`flex gap-4 ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    
-                    {msg.type !== 'user' && (
-                      <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0 mt-1">
-                        <Bot className="w-5 h-5 text-blue-500" />
-                      </div>
-                    )}
-                    
-                    <div className={`max-w-[85%] ${
-                      msg.type === 'user' 
-                        ? 'bg-blue-600/80 backdrop-blur-md border border-blue-500/50 text-white rounded-2xl rounded-tr-sm px-5 py-3 shadow-lg' 
-                        : 'bg-black/40 backdrop-blur-md text-zinc-200 rounded-2xl rounded-tl-sm px-5 py-4 border border-white/10 shadow-lg'
-                    }`}>
-                      
-                      {msg.type === 'loading' ? (
-                        <div className="flex items-center gap-1.5 h-6">
-                          <div className="w-2 h-2 rounded-full bg-zinc-500 animate-bounce" />
-                          <div className="w-2 h-2 rounded-full bg-zinc-500 animate-bounce [animation-delay:0.2s]" />
-                          <div className="w-2 h-2 rounded-full bg-zinc-500 animate-bounce [animation-delay:0.4s]" />
-                        </div>
-                      ) : (
-                        <>
-                          <div className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap">
-                            {msg.content}
-                          </div>
-
-                          {msg.sources && msg.sources.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-zinc-700/50">
-                              <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Sources</div>
-                              <div className="flex flex-wrap gap-2">
-                                {msg.sources.map((src, i) => (
-                                  <div key={i} className="inline-flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 px-2 py-1 rounded text-zinc-300">
-                                    <ChevronRight className="w-3 h-3 text-zinc-500" />
-                                    {formatSource(src.document)} {src.page ? `(p. ${src.page})` : ''}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {msg.agent_trace && msg.agent_trace.length > 0 && (
-                            <div className="mt-4 pt-4 border-t border-zinc-700/50">
-                              <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Agent Trace</div>
-                              <div className="space-y-1.5">
-                                {msg.agent_trace.map((trace, i) => (
-                                  <div key={i} className="text-xs flex items-center gap-2 text-zinc-400">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500/50" />
-                                    <strong className="text-zinc-300">{trace.agent}</strong>
-                                    <span>—</span>
-                                    <span>{trace.action.replace('Gemini + Groq + ChromaDB', 'Azure OpenAI Foundry + Azure AI Search').replace('local ChromaDB', 'Azure AI Search')}</span>
-                                    {trace.elapsed && <span className="text-zinc-600">({trace.elapsed}s)</span>}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
+                <h2 className="font-medium text-white">AskCampus Agent</h2>
+                {isLoading && <div className="ml-2 w-2 h-2 rounded-full bg-blue-500 animate-pulse" />}
+              </div>
+            </div>
+            
+            <div className="w-full max-w-4xl flex-1 flex flex-col p-4 md:p-8 space-y-8 pb-40 relative z-10">
+              {messages.map(msg => (
+                <div key={msg.id} className={`flex gap-4 ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  {msg.type !== 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-[#1e1e22] flex items-center justify-center flex-shrink-0 mt-1 shadow-inner ring-1 ring-white/[0.08]">
+                      <Bot className="w-4 h-4 text-blue-400" />
                     </div>
-
-                    {msg.type === 'user' && (
-                      <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center flex-shrink-0 mt-1">
-                        <User className="w-5 h-5 text-zinc-300" />
+                  )}
+                  
+                  <div className={`max-w-[85%] ${
+                    msg.type === 'user' 
+                      ? 'bg-[#1e1e22] ring-1 ring-white/[0.08] text-white rounded-2xl rounded-tr-sm px-5 py-3 shadow-[0_2px_20px_rgba(0,0,0,0.4)]' 
+                      : 'bg-[#1a1a1e]/80 backdrop-blur-md ring-1 ring-white/[0.08] text-[#e0e0e0] rounded-2xl rounded-tl-sm px-5 py-4 shadow-lg'
+                  }`}>
+                    {msg.type === 'loading' ? (
+                      <div className="flex items-center gap-1.5 h-6">
+                        <div className="w-2 h-2 rounded-full bg-[#5a5a5f] animate-bounce" />
+                        <div className="w-2 h-2 rounded-full bg-[#5a5a5f] animate-bounce [animation-delay:0.2s]" />
+                        <div className="w-2 h-2 rounded-full bg-[#5a5a5f] animate-bounce [animation-delay:0.4s]" />
                       </div>
-                    )}
+                    ) : (
+                      <>
+                        <div className="prose prose-invert prose-sm max-w-none">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
 
+                        {msg.sources && msg.sources.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-white/5">
+                            <div className="text-[10px] font-semibold text-[#5a5a5f] uppercase tracking-wider mb-2">Sources</div>
+                            <div className="flex flex-wrap gap-2">
+                              {msg.sources.map((src, i) => (
+                                <div key={i} className="inline-flex items-center gap-1.5 text-xs bg-white/5 border border-white/10 px-2 py-1 rounded text-[#a0a0a5]">
+                                  <ChevronRight className="w-3 h-3 text-[#5a5a5f]" />
+                                  {formatSource(src.document)} {src.page ? `(p. ${src.page})` : ''}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {msg.agent_trace && msg.agent_trace.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-white/5">
+                            <div className="text-[10px] font-semibold text-[#5a5a5f] uppercase tracking-wider mb-2">Agent Trace</div>
+                            <div className="space-y-1.5">
+                              {msg.agent_trace.map((trace, i) => (
+                                <div key={i} className="text-xs flex items-center gap-2 text-[#8a8a8f]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#1488fc]/50" />
+                                  <strong className="text-[#a0a0a5]">{trace.agent}</strong>
+                                  <span>—</span>
+                                  <span>{trace.action.replace('Gemini + Groq + ChromaDB', 'Azure OpenAI Foundry + Azure AI Search').replace('local ChromaDB', 'Azure AI Search')}</span>
+                                  {trace.elapsed && <span className="text-[#5a5a5f]">({trace.elapsed}s)</span>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                ))
+                  
+                  {msg.type === 'user' && (
+                    <div className="w-8 h-8 rounded-full bg-[#1a1a1e] flex items-center justify-center flex-shrink-0 mt-1 shadow-inner ring-1 ring-white/[0.08]">
+                      <User className="w-4 h-4 text-[#a0a0a5]" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {isLoading && (
+                <div className="flex justify-center my-6">
+                  <div className="flex items-center gap-2 md:gap-4 my-6">
+                    {['Orchestrator', 'Retriever', 'Advisor'].map((step, index) => {
+                      const isActive = activeAgent === step;
+                      const isCompleted = completedAgents.has(step);
+                      return (
+                        <React.Fragment key={step}>
+                          <div className={`flex flex-col items-center gap-2 transition-all duration-300 ${isActive ? 'scale-110 opacity-100' : isCompleted ? 'opacity-70' : 'opacity-30'}`}>
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-lg ${
+                              isActive ? 'bg-blue-500/20 border-blue-500/50 text-blue-400 shadow-blue-500/20' :
+                              isCompleted ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
+                              'bg-white/5 border-white/10 text-[#8a8a8f]'
+                            }`}>
+                              {isCompleted ? <Check className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
+                            </div>
+                            <span className={`text-[10px] font-semibold uppercase tracking-wider ${isActive ? 'text-blue-400' : isCompleted ? 'text-emerald-400' : 'text-[#8a8a8f]'}`}>
+                              {step}
+                            </span>
+                          </div>
+                          {index < 2 && (
+                            <div className="w-8 md:w-12 h-[1px] bg-white/10 relative">
+                              <div className={`absolute left-0 top-0 h-full bg-blue-500 transition-all duration-500 ${
+                                isCompleted ? 'w-full' : 'w-0'
+                              }`} />
+                            </div>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
+              
               <div ref={messagesEndRef} />
             </div>
-
-            <div className="p-4 bg-black/40 backdrop-blur-lg border-t border-white/10">
-              <form onSubmit={handleSubmit} className="relative">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask a question about Chitkara University..."
-                  disabled={isLoading}
-                  className="w-full bg-black/50 backdrop-blur-md border border-white/20 rounded-full py-3.5 pl-6 pr-14 text-sm text-zinc-200 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 disabled:opacity-50 transition-all shadow-inner"
-                />
-                <button
-                  type="submit"
-                  disabled={!input.trim() || isLoading}
-                  className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-blue-600 hover:bg-blue-500 text-white rounded-full disabled:opacity-50 disabled:hover:bg-blue-600 transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </form>
+            
+            {/* Fixed Chat Input when chatting */}
+            <div className="w-full p-4 md:p-6 sticky bottom-0 bg-gradient-to-t from-[#0f0f0f] via-[#0f0f0f] to-transparent pt-10 flex justify-center z-20">
+              <BoltChatInput 
+                value={input}
+                onChange={setInput}
+                onSend={(msg) => handleSubmit(undefined, msg)}
+                placeholder="Ask a question about Chitkara University..."
+                disabled={isLoading}
+              />
             </div>
 
           </div>
-        </div>
+        )}
       </main>
-      
-      <footer className="py-8 text-center text-zinc-600 text-sm mt-12">
-        <p>Powered by AskCampus Multi-Agent Pipeline</p>
-      </footer>
     </div>
   );
 }

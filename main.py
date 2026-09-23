@@ -87,7 +87,8 @@ Rules:
   clearly say that the information was not found
   in the available Chitkara documents.
 - Always cite which document and page the information came from based on the context.
-- Be clear, concise, and helpful."""
+- Be clear, conversational, and helpful.
+- Keep the answer straightforward and simple, without overly complex lists or formats."""
 
 
 # ─── Agents ──────────────────────────────────────────────────
