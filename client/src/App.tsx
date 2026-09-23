@@ -22,7 +22,16 @@ interface Message {
   mode?: string;
 }
 
+interface Session {
+  id: string;
+  title: string;
+  messages: Message[];
+  timestamp: number;
+}
+
 function App() {
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string>(Date.now().toString());
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -32,6 +41,56 @@ function App() {
   const [completedAgents, setCompletedAgents] = useState<Set<string>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('askcampus_sessions');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSessions(parsed);
+      } catch (e) {}
+    }
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setSessions(prev => {
+        const existing = prev.find(s => s.id === currentSessionId);
+        const title = messages[0]?.content.slice(0, 30) + (messages[0]?.content.length > 30 ? '...' : '') || 'New Chat';
+        
+        const newSession: Session = {
+          id: currentSessionId,
+          title,
+          messages,
+          timestamp: existing ? existing.timestamp : Date.now()
+        };
+        
+        const updated = existing 
+          ? prev.map(s => s.id === currentSessionId ? newSession : s)
+          : [newSession, ...prev];
+          
+        localStorage.setItem('askcampus_sessions', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  }, [messages, currentSessionId]);
+
+  const startNewChat = () => {
+    setMessages([]);
+    setCurrentSessionId(Date.now().toString());
+    setCompletedAgents(new Set());
+    setActiveAgent(null);
+  };
+
+  const loadSession = (id: string) => {
+    const session = sessions.find(s => s.id === id);
+    if (session) {
+      setMessages(session.messages);
+      setCurrentSessionId(session.id);
+      setCompletedAgents(new Set(['Orchestrator', 'Retriever', 'Advisor']));
+      setActiveAgent(null);
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -160,45 +219,83 @@ function App() {
 
         <div className="flex-1 flex flex-col md:flex-row gap-8 min-h-[600px]">
           
-          {/* Agent Sidebar */}
-          <div className="w-full md:w-64 bg-black/20 backdrop-blur-md rounded-xl p-6 border border-white/10 shadow-2xl h-fit">
-            <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-6">Agent Pipeline</h3>
+          {/* Sidebar Area */}
+          <div className="w-full md:w-64 space-y-6">
             
-            <div className="space-y-6">
-              {[
-                { id: 'Orchestrator', desc: 'Routes & coordinates' },
-                { id: 'Retriever', desc: 'Vector Search' },
-                { id: 'Advisor', desc: 'Answer generation' }
-              ].map((agent, i) => {
-                const isActive = activeAgent === agent.id;
-                const isDone = completedAgents.has(agent.id);
-                
-                return (
-                  <div key={agent.id} className="relative">
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-0.5 transition-colors ${
-                        isDone ? 'text-green-500' : 
-                        isActive ? 'text-blue-500' : 'text-zinc-700'
-                      }`}>
-                        {isDone ? <CheckCircle2 className="w-5 h-5" /> : 
-                         isActive ? <Circle className="w-5 h-5 fill-current animate-pulse" /> :
-                         <Circle className="w-5 h-5" />}
+            {/* Agent Pipeline */}
+            <div className="bg-black/20 backdrop-blur-md rounded-xl p-6 border border-white/10 shadow-2xl h-fit">
+              <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-6">Agent Pipeline</h3>
+              
+              <div className="space-y-6">
+                {[
+                  { id: 'Orchestrator', desc: 'Routes & coordinates' },
+                  { id: 'Retriever', desc: 'Vector Search' },
+                  { id: 'Advisor', desc: 'Answer generation' }
+                ].map((agent, i) => {
+                  const isActive = activeAgent === agent.id;
+                  const isDone = completedAgents.has(agent.id);
+                  
+                  return (
+                    <div key={agent.id} className="relative">
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 transition-colors ${
+                          isDone ? 'text-green-500' : 
+                          isActive ? 'text-blue-500' : 'text-zinc-700'
+                        }`}>
+                          {isDone ? <CheckCircle2 className="w-5 h-5" /> : 
+                           isActive ? <Circle className="w-5 h-5 fill-current animate-pulse" /> :
+                           <Circle className="w-5 h-5" />}
+                        </div>
+                        <div>
+                          <div className={`text-sm font-medium transition-colors ${
+                            isDone || isActive ? 'text-zinc-200' : 'text-zinc-500'
+                          }`}>{agent.id}</div>
+                          <div className="text-xs text-zinc-600 mt-1">{agent.desc}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div className={`text-sm font-medium transition-colors ${
-                          isDone || isActive ? 'text-zinc-200' : 'text-zinc-500'
-                        }`}>{agent.id}</div>
-                        <div className="text-xs text-zinc-600 mt-1">{agent.desc}</div>
-                      </div>
+                      {i < 2 && (
+                        <div className={`absolute left-2.5 top-6 bottom-[-1.5rem] w-px transition-colors ${
+                          isDone ? 'bg-green-500/30' : 'bg-zinc-800'
+                        }`} />
+                      )}
                     </div>
-                    {i < 2 && (
-                      <div className={`absolute left-2.5 top-6 bottom-[-1.5rem] w-px transition-colors ${
-                        isDone ? 'bg-green-500/30' : 'bg-zinc-800'
-                      }`} />
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Chat History */}
+            <div className="bg-black/20 backdrop-blur-md rounded-xl p-6 border border-white/10 shadow-2xl flex flex-col max-h-[350px]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Chat History</h3>
+                <button 
+                  onClick={startNewChat}
+                  className="text-xs bg-blue-600/80 hover:bg-blue-500 text-white px-2 py-1 rounded transition-colors shadow"
+                >
+                  + New
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                {sessions.length === 0 ? (
+                  <p className="text-xs text-zinc-500 italic">No history yet</p>
+                ) : (
+                  [...sessions].sort((a, b) => b.timestamp - a.timestamp).map(session => (
+                    <div 
+                      key={session.id}
+                      onClick={() => loadSession(session.id)}
+                      className={`text-sm p-2 rounded cursor-pointer truncate transition-colors ${
+                        currentSessionId === session.id 
+                          ? 'bg-white/10 text-zinc-200' 
+                          : 'text-zinc-400 hover:bg-white/5 hover:text-zinc-300'
+                      }`}
+                      title={session.title}
+                    >
+                      {session.title}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
 
