@@ -38,8 +38,8 @@ print(f"   Loaded {len(documents)} pages from PDFs.")
 
 print("✂️  Splitting into chunks ...")
 splitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=200,
+    chunk_size=1500,
+    chunk_overlap=400,
 )
 chunks = splitter.split_documents(documents)
 print(f"   Created {len(chunks)} chunks.")

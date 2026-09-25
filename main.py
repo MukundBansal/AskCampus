@@ -102,7 +102,7 @@ def retriever_agent(question: str) -> dict:
     if not vector_store:
         return {"chunks": [], "sources": [], "elapsed": 0}
 
-    results = vector_store.similarity_search(question, k=5)
+    results = vector_store.similarity_search(question, k=8)
 
     chunks = []
     sources = []
